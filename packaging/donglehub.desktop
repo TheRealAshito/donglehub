@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=DongleHub
+Comment=Battery and settings hub for the MCHOSE V9 PRO headset and AttackShark X11 mouse
+Exec=donglehub gui
+Icon=battery
+Terminal=false
+Categories=Utility;Settings;HardwareSettings;
+Keywords=headset;mouse;battery;mchose;attackshark;dongle;
