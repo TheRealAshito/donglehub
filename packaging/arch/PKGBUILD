@@ -3,7 +3,7 @@
 #   curl -L https://github.com/TheRealAshito/donglehub/archive/refs/tags/v$pkgver.tar.gz -o donglehub-$pkgver.tar.gz
 #   makepkg -si
 pkgname=donglehub
-pkgver=0.1.0
+pkgver=0.1.1
 pkgrel=1
 pkgdesc="Battery + settings hub for the MCHOSE V9 PRO headset and AttackShark X11 mouse"
 arch=(any)

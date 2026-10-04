@@ -6,7 +6,7 @@ import sys
 import time
 
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
-from PyQt6.QtGui import QAction
+from PyQt6.QtGui import QAction, QIcon
 from PyQt6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -313,26 +313,29 @@ class MainWindow(QMainWindow):
         self.poller = None
         self.tray = None
         if hub is not None:
+            self._setup_tray()
             self.poller = Poller(hub, self.headset_card.audio, parent=self)
             self.poller.updated.connect(self._on_poll)
             self.headset_card.attach_poller(self.poller)
             self.poller.start()
-            self._setup_tray()
 
     def _setup_tray(self):
-        if not QSystemTrayIcon.isSystemTrayAvailable():
-            return
-        self.tray = QSystemTrayIcon(self.windowTitle(), self)
-        menu = QMenu()
-        show = QAction("Show", self)
-        show.triggered.connect(self.show)
-        quit_a = QAction("Quit", self)
-        quit_a.triggered.connect(self.close)
-        menu.addAction(show)
-        menu.addAction(quit_a)
-        self.tray.setContextMenu(menu)
-        self.tray.setToolTip("DongleHub")
-        self.tray.show()
+        try:
+            self.tray = QSystemTrayIcon(QIcon.fromTheme("battery"), self)
+            menu = QMenu(self)
+            show = QAction("Show", self)
+            show.triggered.connect(self.show)
+            quit_a = QAction("Quit", self)
+            quit_a.triggered.connect(self.close)
+            menu.addAction(show)
+            menu.addAction(quit_a)
+            self.tray.setContextMenu(menu)
+            self.tray.setToolTip("DongleHub")
+            if QSystemTrayIcon.isSystemTrayAvailable():
+                self.tray.show()
+        except Exception:
+            # The tray is optional chrome; never let it kill the app.
+            self.tray = None
 
     def update_devices(self, hs: DeviceStatus, ms: DeviceStatus) -> None:
         self.headset_card.update_from(hs)

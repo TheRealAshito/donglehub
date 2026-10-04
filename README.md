@@ -67,7 +67,8 @@ The udev rules matter: without them both devices are root-only and the hub
     donglehub status            # both devices, one line each
     donglehub status --json     # machine-readable snapshot
     donglehub watch --json      # stream snapshots (used by the shell widget)
-    donglehub gui               # desktop app (or: donglehub-gui)
+    donglehub gui               # desktop app (or: donglehub-gui, or just
+                                # `donglehub` on a desktop session)
 
     donglehub set-eq music      # headset EQ: game1 | game2 | music
     donglehub set-mouse --color 1 --polling 1000 --angle-snap on \

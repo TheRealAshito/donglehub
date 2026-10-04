@@ -73,6 +73,23 @@ def test_set_mouse_rejects_bad_polling(capsys):
     assert cli.main(["set-mouse", "--polling", "333"], hub=hub) != 0
 
 
+def test_bare_command_launches_gui_when_display_available(monkeypatch):
+    monkeypatch.setenv("WAYLAND_DISPLAY", "wayland-0")
+    calls = []
+    monkeypatch.setattr(cli, "cmd_gui", lambda: calls.append(True) or 0)
+    assert cli.main([]) == 0
+    assert calls == [True]
+
+
+def test_bare_command_prints_help_on_headless(capsys, monkeypatch):
+    monkeypatch.delenv("DISPLAY", raising=False)
+    monkeypatch.delenv("WAYLAND_DISPLAY", raising=False)
+    assert cli.main([]) == 0
+    out = capsys.readouterr().out
+    assert "usage:" in out
+    assert "gui" in out
+
+
 def test_watch_emits_snapshot_and_stops():
     hub = make_hub()
     snaps = []

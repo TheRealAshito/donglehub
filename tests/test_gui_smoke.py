@@ -52,6 +52,18 @@ def test_card_updates_for_disconnected_device(qapp):
     assert card.battery_bar.value() == 0
 
 
+def test_tray_setup_constructs_tray_icon(qapp, monkeypatch):
+    from PyQt6.QtWidgets import QSystemTrayIcon
+
+    from donglehub import gui
+
+    monkeypatch.setattr(QSystemTrayIcon, "isSystemTrayAvailable", staticmethod(lambda: True))
+    win = gui.MainWindow(headset=None, mouse=None)
+    win._setup_tray()
+    assert isinstance(win.tray, QSystemTrayIcon)
+    win.close()
+
+
 def test_power_label_covers_all_states(qapp):
     from donglehub.gui import power_text
 

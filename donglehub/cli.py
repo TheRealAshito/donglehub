@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 
 from .hub import Hub, watch_loop
@@ -33,7 +34,7 @@ def parse_args(argv):
         description="Battery and settings hub for the MCHOSE V9 PRO headset "
                     "and AttackShark X11 mouse.",
     )
-    sub = p.add_subparsers(dest="cmd", required=True)
+    sub = p.add_subparsers(dest="cmd")
 
     st = sub.add_parser("status", help="show both devices once")
     st.add_argument("--json", action="store_true")
@@ -60,7 +61,7 @@ def parse_args(argv):
 
     sub.add_parser("gui", help="open the desktop app")
 
-    return p.parse_args(argv)
+    return p, p.parse_args(argv)
 
 
 def cmd_status(hub, as_json: bool) -> int:
@@ -155,7 +156,14 @@ def cmd_gui() -> int:
 
 
 def main(argv=None, hub=None) -> int:
-    args = parse_args(argv)
+    parser, args = parse_args(argv)
+    if args.cmd is None:
+        # Bare `donglehub`: open the app on a desktop session, show help
+        # everywhere else.
+        if os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"):
+            return cmd_gui()
+        parser.print_help()
+        return 0
     if args.cmd == "gui":
         return cmd_gui()
     hub = hub or build_hub()
