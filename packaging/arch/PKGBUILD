@@ -3,13 +3,13 @@
 #   curl -L https://github.com/TheRealAshito/donglehub/archive/refs/tags/v$pkgver.tar.gz -o donglehub-$pkgver.tar.gz
 #   makepkg -si
 pkgname=donglehub
-pkgver=0.1.1
+pkgver=0.2.0
 pkgrel=1
 pkgdesc="Battery + settings hub for the MCHOSE V9 PRO headset and AttackShark X11 mouse"
 arch=(any)
 url="https://github.com/TheRealAshito/donglehub"
 license=(MIT)
-depends=(python python-pyqt6 python-pyusb hidapi libusb wireplumber)
+depends=(python python-pyqt6 python-pyusb hidapi libusb wireplumber pipewire)
 makedepends=(python-build python-installer python-wheel python-setuptools)
 source=("$pkgname-$pkgver.tar.gz")
 sha256sums=('SKIP')

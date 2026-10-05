@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 import time
 
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PyQt6.QtCore import Qt, QThread, QTimer, pyqtSignal
 from PyQt6.QtGui import QAction, QIcon
 from PyQt6.QtWidgets import (
     QApplication,
@@ -16,17 +16,22 @@ from PyQt6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QMainWindow,
     QMenu,
     QPushButton,
     QProgressBar,
     QSlider,
     QSystemTrayIcon,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
 
 from .audio import AudioService
+from .eq import store
+from .eq.control import EqController
+from .eq.model import BANDS, EqSettings
 from .hub import device_lock
 from .models import DeviceStatus, PowerState
 from .protocols import mchose, x11
@@ -291,6 +296,174 @@ class MouseCard(DeviceCard):
             self.apply_label.setText(f"Failed: {e}")
 
 
+class EqCard(QFrame):
+    """System-wide EQ: 10 bands + preamp + HeSuVi virtual surround."""
+
+    MAX_GAIN = 12.0
+    MAX_PREAMP = 20.0
+
+    def __init__(self, controller=None, parent=None):
+        super().__init__(parent)
+        self.controller = controller or EqController()
+        self.settings = store.load_active()
+        self._syncing = False
+
+        root = QVBoxLayout()
+
+        head = QHBoxLayout()
+        self.enable_check = QCheckBox("Enable EQ sink")
+        self.enable_check.toggled.connect(self._toggle_enable)
+        self.preset_box = QComboBox()
+        self._reload_presets()
+        load_btn = QPushButton("Load")
+        load_btn.clicked.connect(self._load_preset)
+        save_btn = QPushButton("Save")
+        save_btn.clicked.connect(self._save_preset)
+        self.status_label = QLabel("")
+        head.addWidget(self.enable_check)
+        head.addStretch(1)
+        head.addWidget(self.preset_box)
+        head.addWidget(load_btn)
+        head.addWidget(save_btn)
+        root.addLayout(head)
+
+        sliders = QHBoxLayout()
+        self.preamp_slider = self._make_slider(self.MAX_PREAMP)
+        self.preamp_slider.valueChanged.connect(self._preamp_changed)
+        pre_col = QVBoxLayout()
+        pre_col.addWidget(QLabel("Pre"), alignment=Qt.AlignmentFlag.AlignCenter)
+        pre_col.addWidget(self.preamp_slider)
+        sliders.addLayout(pre_col)
+        self.band_sliders = []
+        for i, band in enumerate(BANDS):
+            s = self._make_slider(self.MAX_GAIN)
+            s.valueChanged.connect(lambda v, idx=i: self._band_changed(idx, v))
+            col = QVBoxLayout()
+            col.addWidget(QLabel(band.label), alignment=Qt.AlignmentFlag.AlignCenter)
+            col.addWidget(s)
+            sliders.addLayout(col)
+            self.band_sliders.append(s)
+        root.addLayout(sliders)
+
+        surround_row = QHBoxLayout()
+        self.surround_check = QCheckBox("7.1 virtual surround (HeSuVi HRIR)")
+        self.surround_check.toggled.connect(self._toggle_surround)
+        self.hrir_edit = QLineEdit(self.settings.hrir or "")
+        self.hrir_edit.setPlaceholderText("/path/to/hesuvi.wav")
+        self.hrir_edit.editingFinished.connect(self._hrir_changed)
+        surround_row.addWidget(self.surround_check)
+        surround_row.addWidget(self.hrir_edit, 1)
+        root.addLayout(surround_row)
+        root.addWidget(self.status_label)
+        self.setLayout(root)
+
+        self._sync_from_settings()
+
+    @staticmethod
+    def _make_slider(limit):
+        s = QSlider(Qt.Orientation.Horizontal)
+        s.setRange(int(-limit * 10), int(limit * 10))
+        s.setValue(0)
+        s.setTickPosition(QSlider.TickPosition.TicksBelow)
+        return s
+
+    def _sync_from_settings(self):
+        self._syncing = True
+        for s, g in zip(self.band_sliders, self.settings.gains):
+            s.setValue(int(round(g * 10)))
+        self.preamp_slider.setValue(int(round(self.settings.preamp * 10)))
+        self.surround_check.setChecked(self.settings.mode == "surround")
+        self._syncing = False
+
+    def _reload_presets(self):
+        self.preset_box.clear()
+        self.preset_box.addItems(store.list_presets())
+
+    def set_band_value(self, index, value):
+        try:
+            self.settings.gains[index] = float(value)
+            EqSettings(**{**self.settings.to_dict()})
+        except ValueError as e:
+            self.status_label.setText(str(e))
+            self.settings.gains[index] = 0.0
+            return
+        store.save_active(self.settings)
+        self.controller.set_band(index, float(value), self.settings)
+        self.status_label.setText(f"band {index + 1} ({BANDS[index].label}): {float(value):+.1f} dB")
+
+    def set_preamp_value(self, value):
+        try:
+            self.settings.preamp = float(value)
+            EqSettings(**{**self.settings.to_dict()})
+        except ValueError as e:
+            self.status_label.setText(str(e))
+            self.settings.preamp = 0.0
+            return
+        store.save_active(self.settings)
+        self.controller.set_preamp(float(value), self.settings)
+        self.status_label.setText(f"preamp: {float(value):+.1f} dB")
+
+    def _band_changed(self, index, slider_value):
+        if not self._syncing:
+            self.set_band_value(index, slider_value / 10.0)
+
+    def _preamp_changed(self, slider_value):
+        if not self._syncing:
+            self.set_preamp_value(slider_value / 10.0)
+
+    def _toggle_enable(self, checked):
+        if checked:
+            msg = self.controller.install(self.settings)
+            self.status_label.setText(msg)
+        else:
+            self.controller.disable()
+            self.status_label.setText("EQ disabled")
+
+    def _toggle_surround(self, checked):
+        if self._syncing:
+            return
+        if checked and not self.settings.hrir:
+            self.status_label.setText("Set the HeSuVi HRIR wav path first")
+            self._syncing = True
+            self.surround_check.setChecked(False)
+            self._syncing = False
+            return
+        self.settings.mode = "surround" if checked else "eq"
+        store.save_active(self.settings)
+        self.controller.restart()
+        self.status_label.setText(
+            "virtual surround enabled" if checked else "virtual surround disabled"
+        )
+
+    def _hrir_changed(self):
+        path = self.hrir_edit.text().strip()
+        if path and path != self.settings.hrir:
+            self.settings.hrir = path
+            store.save_active(self.settings)
+            self.status_label.setText(f"hrir: {path}")
+
+    def _load_preset(self):
+        name = self.preset_box.currentText()
+        if not name:
+            return
+        try:
+            self.settings = store.load_preset(name)
+        except KeyError:
+            return
+        store.save_active(self.settings)
+        self._sync_from_settings()
+        self.controller.apply(self.settings, None)
+        self.controller.restart()
+        self.status_label.setText(f"loaded preset {name!r}")
+
+    def _save_preset(self):
+        name = self.preset_box.currentText().strip() or "custom"
+        store.save_preset(name, self.settings)
+        self._reload_presets()
+        self.preset_box.setCurrentText(name)
+        self.status_label.setText(f"saved preset {name!r}")
+
+
 class MainWindow(QMainWindow):
     def __init__(self, headset=None, mouse=None, hub=None, parent=None):
         super().__init__(parent)
@@ -298,17 +471,22 @@ class MainWindow(QMainWindow):
         self.headset_dev = headset
         self.mouse_dev = mouse
         self.setWindowTitle("DongleHub")
-        self.resize(720, 520)
+        self.resize(780, 560)
 
         self.headset_card = HeadsetCard(set_eq_fn=self._set_eq)
         self.mouse_card = MouseCard(apply_fn=self._apply_mouse)
+        self.eq_card = EqCard()
 
-        central = QWidget()
+        devices = QWidget()
         row = QHBoxLayout()
         row.addWidget(self.headset_card, 1)
         row.addWidget(self.mouse_card, 1)
-        central.setLayout(row)
-        self.setCentralWidget(central)
+        devices.setLayout(row)
+
+        tabs = QTabWidget()
+        tabs.addTab(devices, "Devices")
+        tabs.addTab(self.eq_card, "EQ")
+        self.setCentralWidget(tabs)
 
         self.poller = None
         self.tray = None

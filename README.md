@@ -39,6 +39,11 @@ Shell integration:
 - ready-made QML service + sidebar card for Caelestia Shell — see
   [shell/caelestia/README.md](shell/caelestia/README.md)
 
+System-wide EQ (HeSuVi / EqualizerAPO-style):
+- 10-band + preamp EQ as a PipeWire virtual sink ("DongleHub EQ")
+- 7.1 virtual surround via HeSuVi HRIR convolution ("DongleHub Surround")
+- live gain control (no audio dropouts), presets, GUI tab + CLI
+
 ## Install (CachyOS / Arch, also Debian-based)
 
     ./install.sh
@@ -109,6 +114,48 @@ Layout: `donglehub/protocols/` are pure packet encoders/decoders,
 `backends/` wrap libhidapi (ctypes) and libusb (pyusb), `devices/` drive the
 two peripherals, `hub.py` polls behind a cross-process lock, `cli.py` and
 `gui.py` are the front ends. See `tests/` for the packet examples.
+
+## System-wide EQ + virtual surround
+
+DongleHub can run a system-wide EQ the way EqualizerAPO/HeSuVi do on Windows:
+a PipeWire filter-chain virtual sink with a 10-band graphic EQ (31 Hz–16 kHz)
+plus preamp, and optionally a 7.1 → stereo virtual surround stage that
+convolves HeSuVi HRIRs. Band changes are pushed live over `pw-cli` — no audio
+dropouts, no restarting the audio stack.
+
+One-time setup (writes `~/.config/pipewire/filter-chain.conf.d/donglehub-eq.conf`
+and a `donglehub-eq.service` user unit, then enables it):
+
+    donglehub eq install
+
+Then pick **DongleHub EQ** as your output device (system default or per-app in
+KDE's audio settings). Usage:
+
+    donglehub eq set 3 2.5        # band 3 (125 Hz) +2.5 dB, applied live
+    donglehub eq preamp -3
+    donglehub eq flat             # reset to 0 dB
+    donglehub eq save bass        # save current curve as a preset
+    donglehub eq preset           # list presets
+    donglehub eq preset bass      # load one
+    donglehub eq off              # disable the EQ sink
+    donglehub eq on
+
+Virtual surround (HeSuVi):
+
+    donglehub eq hrir ~/hrirs/hesuvi.wav   # HeSuVi's 14-channel HRIR wav
+    donglehub eq surround on               # sink becomes "DongleHub Surround" (7.1 in)
+    donglehub eq surround off
+
+Get the HRIR wav from [HeSuVi](https://hesuvi.com/) (the plain 14-channel
+`hesuvi.wav`, not the per-channel variants) or from any HRIR pack — the
+flathub app "Virtual Surround Manager" is a handy HRIR downloader if you want
+one. With surround on, set your game's audio output to 7.1 and the filter
+does the HRTF downmix. The EQ keeps working after the surround stage.
+
+The GUI's **EQ** tab does all of the above with sliders and presets. Topology
+changes (surround on/off, presets) restart only `donglehub-eq.service` —
+PipeWire itself is never touched. `donglehub eq status` shows the current
+curve.
 
 ## Known limits
 

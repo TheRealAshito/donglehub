@@ -36,6 +36,9 @@ def parse_args(argv):
     )
     sub = p.add_subparsers(dest="cmd")
 
+    from .eq import cli as eqcli
+    eqcli.add_parser(sub)
+
     st = sub.add_parser("status", help="show both devices once")
     st.add_argument("--json", action="store_true")
 
@@ -155,7 +158,7 @@ def cmd_gui() -> int:
     return run()
 
 
-def main(argv=None, hub=None) -> int:
+def main(argv=None, hub=None, eq_controller=None) -> int:
     parser, args = parse_args(argv)
     if args.cmd is None:
         # Bare `donglehub`: open the app on a desktop session, show help
@@ -164,6 +167,10 @@ def main(argv=None, hub=None) -> int:
             return cmd_gui()
         parser.print_help()
         return 0
+    if args.cmd == "eq":
+        from .eq import cli as eqcli
+
+        return eqcli.dispatch(args, eq_controller)
     if args.cmd == "gui":
         return cmd_gui()
     hub = hub or build_hub()
