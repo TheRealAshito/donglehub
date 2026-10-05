@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "donglehub"
-version = "0.4.0"
+version = "0.5.0"
 description = "Battery + settings hub for the MCHOSE V9 PRO headset and AttackShark X11 mouse on Linux"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -20,3 +20,6 @@ donglehub-gui = "donglehub.gui:run"
 
 [tool.setuptools.packages.find]
 include = ["donglehub*"]
+
+[tool.setuptools.package-data]
+donglehub = ["assets/caelestia/*.qml"]

@@ -39,6 +39,17 @@ def parse_args(argv):
     from .eq import cli as eqcli
     eqcli.add_parser(sub)
 
+    ca = sub.add_parser("caelestia", help="Caelestia Shell (Quickshell) bar integration")
+    cas = ca.add_subparsers(dest="cae_cmd", required=True)
+    ci = cas.add_parser("install", help="install the QML and wire the bar status icons")
+    ci.add_argument("--mode", choices=["overlay", "system"], default="overlay",
+                    help="overlay: user copy under ~/.config/quickshell (default); "
+                         "system: patch the installed shell tree in place")
+    ci.add_argument("--shell-root", default=None,
+                    help="path to the installed shell QML tree (auto-detected)")
+    ci.add_argument("--dry-run", action="store_true")
+    cas.add_parser("status", help="show what is installed where")
+
     st = sub.add_parser("status", help="show both devices once")
     st.add_argument("--json", action="store_true")
 
@@ -149,6 +160,31 @@ def cmd_probe(hub, device: str) -> int:
     return 0
 
 
+def cmd_caelestia(args) -> int:
+    from . import caelestia
+
+    if args.cae_cmd == "install":
+        try:
+            report = caelestia.install(
+                mode=args.mode, shell_root=args.shell_root, dry_run=args.dry_run
+            )
+        except (FileNotFoundError, ValueError, OSError) as e:
+            print(f"install failed: {e}", file=sys.stderr)
+            return 2
+        for action in report["actions"]:
+            print(f"- {action}")
+        print(f"target: {report['target']}")
+        if not args.dry_run:
+            print("now reload Quickshell (your Caelestia reload keybind); "
+                  "re-run this after `caelestia update`")
+        return 0
+
+    st = caelestia.status()
+    for key, value in st.items():
+        print(f"{key:16} {value}")
+    return 0
+
+
 def cmd_gui() -> int:
     try:
         from .gui import run
@@ -171,6 +207,8 @@ def main(argv=None, hub=None, eq_controller=None) -> int:
         from .eq import cli as eqcli
 
         return eqcli.dispatch(args, eq_controller)
+    if args.cmd == "caelestia":
+        return cmd_caelestia(args)
     if args.cmd == "gui":
         return cmd_gui()
     hub = hub or build_hub()
