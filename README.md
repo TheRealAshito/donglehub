@@ -36,8 +36,9 @@ Mouse controls (from attack-shark-x11-linux):
 
 Shell integration:
 - `donglehub watch --json` streams JSON snapshots (one line per poll)
-- ready-made QML service + sidebar card for Caelestia Shell — see
-  [shell/caelestia/README.md](shell/caelestia/README.md)
+- Caelestia Shell (Quickshell) on Hyprland: status-icon entries in the bar
+  (headset + mouse battery with charging state and tooltips) plus an optional
+  sidebar card — see [shell/caelestia/README.md](shell/caelestia/README.md)
 
 System-wide EQ (HeSuVi / EqualizerAPO-style):
 - 10-band + preamp EQ as a PipeWire virtual sink ("DongleHub EQ")

@@ -21,6 +21,8 @@ Singleton {
     property bool mouseCharging: false
     property string mousePower: "unknown"
 
+    readonly property string summary: `Headset ${headsetConnected ? `${Math.round(headsetBattery)}%` : "—"} | Mouse ${mouseConnected ? `${Math.round(mouseBattery)}%` : "—"}`
+
     function applySnapshot(obj: var): void {
         const h = obj.devices.headset;
         const m = obj.devices.mouse;
